@@ -1,0 +1,13 @@
+{
+  "accuracy": 83.42,
+  "precision": 83.57,
+  "recall": 83.42,
+  "f1_score": 83.45,
+  "classes": [
+    "High",
+    "Low",
+    "Medium"
+  ],
+  "n_train": 40000,
+  "n_test": 10000
+}

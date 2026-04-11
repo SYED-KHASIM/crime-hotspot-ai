@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CrimeHotspotAI India — Police Patrol Optimization</title>
+  <meta name="description" content="ML-powered crime hotspot prediction for India — optimized police patrol allocation" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet.js -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* ── High Risk Alert Banner ── */
+    .high-risk-alert {
+      display: none;
+      background: linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.1));
+      border: 1px solid rgba(239,68,68,.5);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      animation: alertPulse 2s ease-in-out infinite;
+    }
+    .high-risk-alert.show { display: flex; align-items: flex-start; gap: .75rem; }
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.3); }
+      50%       { box-shadow: 0 0 0 8px rgba(239,68,68,.0); }
+    }
+    .alert-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .alert-body {}
+    .alert-title { font-weight: 700; color: #f87171; font-size: .95rem; margin-bottom: .2rem; }
+    .alert-desc  { font-size: .83rem; color: #fca5a5; }
+
+    /* ── Auth in Navbar ── */
+    .nav-user { display: flex; align-items: center; gap: .75rem; }
+    .nav-user-chip { background: rgba(99,102,241,.12); color: #6366f1; padding: .25rem .75rem; border-radius: 20px; font-size: .8rem; font-weight: 500; }
+    .nav-logout { background: none; border: 1px solid rgba(248,113,113,.3); color: #f87171; padding: .25rem .65rem; border-radius: 6px; font-size: .8rem; cursor: pointer; font-family: inherit; transition: all .2s; }
+    .nav-logout:hover { background: rgba(248,113,113,.1); }
+    .nav-login-btn { background: #6366f1; color: #fff; border: none; padding: .35rem .85rem; border-radius: 6px; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .nav-login-btn:hover { background: #4f46e5; }
+
+    /* ── State/District dropdowns ── */
+    .state-district-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    @media (max-width: 500px) { .state-district-row { grid-template-columns: 1fr; } }
+
+    /* ── Dashboard link in nav ── */
+    .nav-dash-link { color: #6366f1 !important; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <!-- ─── NAVBAR ──────────────────────────────────────────────────────────── -->
+  <nav id="navbar">
+    <div class="nav-inner">
+      <a href="#" class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" stroke="var(--primary)" stroke-width="1.5" fill="none"/>
+          <path d="M12 8v4l3 2" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        CrimeHotspot<span>AI</span> 🇮🇳
+      </a>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#predict">Predict</a></li>
+        <li><a href="#map">Heatmap</a></li>
+        <li><a href="#results">Results</a></li>
+        <li><a href="#history">History</a></li>
+        <li><a href="dashboard.html" class="nav-dash-link">📊 Dashboard</a></li>
+      </ul>
+      <div class="nav-user" id="nav-user-area">
+        <!-- Filled by JS -->
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ─── HERO ─────────────────────────────────────────────────────────────── -->
+  <section id="hero" class="hero">
+    <div class="hero-bg"></div>
+    <div class="grid-overlay"></div>
+    <div class="hero-content fade-in">
+      <span class="badge">Final Year Project · CSE · 2025 · 🇮🇳 India</span>
+      <h1>Identification of Crime Hotspots<br />Using <span class="gradient-text">Machine Learning</span></h1>
+      <p class="hero-sub">
+        Leveraging Gradient Boosting to analyze spatial &amp; temporal crime patterns across
+        <strong>25 Indian districts</strong> for optimized police patrol allocation and smarter public safety.
+      </p>
+      <div class="hero-btns">
+        <button class="btn-primary" onclick="document.getElementById('predict').scrollIntoView({behavior:'smooth'})">
+          Try Live Prediction &rarr;
+        </button>
+        <button class="btn-outline" onclick="window.location.href='dashboard.html'">
+          📊 View Dashboard
+        </button>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-card"><div class="stat-val">50K+</div><div class="stat-lbl">Crime Records</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-accuracy">83.4%</div><div class="stat-lbl">Model Accuracy</div></div>
+        <div class="stat-card"><div class="stat-val">25</div><div class="stat-lbl">Indian Districts</div></div>
+        <div class="stat-card"><div class="stat-val">3</div><div class="stat-lbl">Risk Levels</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── ABOUT ────────────────────────────────────────────────────────────── -->
+  <section id="about" class="section">
+    <div class="container">
+      <div class="section-label">Overview</div>
+      <h2 class="section-title">About the <span class="gradient-text">Project</span></h2>
+      <div class="about-grid">
+        <div class="about-text">
+          <p>
+            This system uses a trained <strong>Gradient Boosting Classifier</strong> to predict crime
+            hotspot risk levels across <strong>25 Indian police districts</strong>. By analysing district geography,
+            time of day, and seasonal patterns, it helps law-enforcement agencies allocate patrol resources
+            proactively rather than reactively.
+          </p>
+          <p>
+            The model was trained on a dataset of <strong>50,000 synthetic records</strong> inspired
+            by real-world India crime data, covering major cities from Mumbai to Srinagar, encoding
+            district-level crime rates, festive season spikes, and hour-of-day patterns with added noise for realism.
+          </p>
+        </div>
+        <div class="about-cards">
+          <div class="info-card"><div class="ic-icon">🎯</div><div><strong>Goal</strong><br /><small>Predict crime risk per district, month, and hour</small></div></div>
+          <div class="info-card"><div class="ic-icon">🤖</div><div><strong>Model</strong><br /><small>Gradient Boosting — best F1-score among all tested</small></div></div>
+          <div class="info-card"><div class="ic-icon">🗺️</div><div><strong>Coverage</strong><br /><small>25 Indian districts across 15+ states</small></div></div>
+          <div class="info-card"><div class="ic-icon">⚖️</div><div><strong>Imbalance</strong><br /><small>Handled via class-weighted training strategy</small></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── PREDICTION TOOL ───────────────────────────────────────────────────── -->
+  <section id="predict" class="section alt-section">
+    <div class="container">
+      <div class="section-label">Live AI Prediction</div>
+      <h2 class="section-title">Crime Hotspot <span class="gradient-text">Predictor</span></h2>
+      <p class="section-sub">Select an Indian state and district to get a real-time ML prediction.</p>
+
+      <div class="predict-grid">
+
+        <!-- Input Form -->
+        <div class="glass-card predict-form">
+          <h3>Input Parameters</h3>
+
+          <!-- HIGH RISK ALERT -->
+          <div class="high-risk-alert" id="high-risk-alert">
+            <div class="alert-icon">⚠️</div>
+            <div class="alert-body">
+              <div class="alert-title">🚨 High Crime Risk Detected!</div>
+              <div class="alert-desc">Increase patrol units immediately. Establish checkpoints and deploy rapid response teams to this area.</div>
+            </div>
+          </div>
+
+          <!-- State Dropdown -->
+          <div class="form-group">
+            <label for="state-select">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+              State / UT
+            </label>
+            <select id="state-select" onchange="onStateChange()">
+              <option value="">— Select a State —</option>
+            </select>
+          </div>
+
+          <!-- District Dropdown -->
+          <div class="form-group">
+            <label for="district">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              District
+            </label>
+            <select id="district" disabled>
+              <option value="">— Select state first —</option>
+            </select>
+            <div class="field-error" id="err-district"></div>
+          </div>
+
+          <!-- Month -->
+          <div class="form-group">
+            <label for="month">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Month
+            </label>
+            <select id="month">
+              <option value="">— Select month —</option>
+              <option value="1">January</option><option value="2">February</option>
+              <option value="3">March</option><option value="4">April</option>
+              <option value="5">May</option><option value="6">June</option>
+              <option value="7">July</option><option value="8">August</option>
+              <option value="9">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
+            </select>
+            <div class="field-error" id="err-month"></div>
+          </div>
+
+          <!-- Hour -->
+          <div class="form-group">
+            <label for="hour">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Hour of Day (0 – 23)
+            </label>
+            <div class="hour-input-row">
+              <input type="number" id="hour" min="0" max="23" placeholder="e.g. 22" />
+              <span class="hour-label" id="hour-label">—</span>
+            </div>
+            <div class="field-error" id="err-hour"></div>
+          </div>
+
+          <!-- API status -->
+          <div class="api-status" id="api-status">
+            <span class="dot" id="api-dot"></span>
+            <span id="api-text">Checking API…</span>
+          </div>
+
+          <button class="btn-primary w-full" id="predict-btn" onclick="runPrediction()">
+            <span id="predict-label">Predict Risk Level</span>
+            <div class="spinner hidden" id="predict-spinner"></div>
+          </button>
+        </div>
+
+        <!-- Results Panel -->
+        <div id="result-panel" class="glass-card result-panel empty-panel">
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon">🛡️</div>
+            <div class="empty-title">No Prediction Yet</div>
+            <div class="empty-sub">Fill in the parameters and click Predict</div>
+          </div>
+
+          <div class="result-content hidden" id="result-content">
+            <h3>Prediction Result</h3>
+            <div class="risk-badge-container" id="risk-badge-container">
+              <div class="risk-icon" id="risk-icon"></div>
+              <div class="risk-label" id="risk-label"></div>
+              <div class="risk-sub" id="risk-sub"></div>
+            </div>
+            <div class="result-stats">
+              <div class="rstat"><div class="rstat-val" id="res-confidence">—</div><div class="rstat-lbl">Confidence</div></div>
+              <div class="rstat"><div class="rstat-val" id="res-patrols">—</div><div class="rstat-lbl">Patrol Units</div></div>
+              <div class="rstat"><div class="rstat-val" id="res-urgency">—</div><div class="rstat-lbl">Urgency</div></div>
+            </div>
+            <div class="prob-section">
+              <div class="prob-title">Class Probabilities</div>
+              <div class="prob-bars" id="prob-bars"></div>
+            </div>
+            <div class="suggestion-box" id="suggestion-box">
+              <div class="sug-label">🚔 Patrol Recommendation</div>
+              <div class="sug-text" id="sug-text"></div>
+            </div>
+          </div>
+
+          <div class="error-panel hidden" id="error-panel">
+            <div class="error-icon">⚠️</div>
+            <div class="error-title" id="error-title">Prediction Failed</div>
+            <div class="error-msg" id="error-msg"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── INDIA MAP ─────────────────────────────────────────────────────────── -->
+  <section id="map" class="section">
+    <div class="container">
+      <div class="section-label">Spatial View — India</div>
+      <h2 class="section-title">Crime Hotspot <span class="gradient-text">Heatmap</span></h2>
+      <p class="section-sub">Interactive India map showing risk levels across all 25 districts with state boundaries.</p>
+
+      <div class="map-controls">
+        <button class="map-btn active" onclick="loadAllDistricts(this)">All Districts</button>
+        <button class="map-btn" onclick="filterMap('High', this)">High Risk</button>
+        <button class="map-btn" onclick="filterMap('Medium', this)">Medium Risk</button>
+        <button class="map-btn" onclick="filterMap('Low', this)">Low Risk</button>
+        <div class="map-time">
+          <label>Hour: <strong id="map-hour-val">14</strong></label>
+          <input type="range" id="map-hour" min="0" max="23" value="14" oninput="onMapHourChange(this.value)" />
+        </div>
+        <div class="map-month-select">
+          <select id="map-month" onchange="loadAllDistricts()">
+            <option value="6">June</option>
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5">May</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="crime-map"></div>
+
+      <div class="map-legend">
+        <div class="legend-item"><span class="legend-dot high"></span> High Risk</div>
+        <div class="legend-item"><span class="legend-dot medium"></span> Medium Risk</div>
+        <div class="legend-item"><span class="legend-dot low"></span> Low Risk</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── MODEL RESULTS ───────────────────────────────────────────────────── -->
+  <section id="results" class="section alt-section">
+    <div class="container">
+      <div class="section-label">Performance</div>
+      <h2 class="section-title">Model <span class="gradient-text">Results</span></h2>
+      <div class="metrics-grid" id="metrics-grid">
+        <div class="metric-card"><div class="mc-val" id="m-accuracy">—</div><div class="mc-lbl">Accuracy</div></div>
+        <div class="metric-card"><div class="mc-val" id="m-precision">—</div><div class="mc-lbl">Precision</div></div>
+        <div class="metric-card"><div class="mc-val" id="m-recall">—</div><div class="mc-lbl">Recall</div></div>
+        <div class="metric-card"><div class="mc-val" id="m-f1">—</div><div class="mc-lbl">F1-Score</div></div>
+      </div>
+      <div class="comparison-table-wrap">
+        <h3>Model Comparison</h3>
+        <table class="comparison-table">
+          <thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1-Score</th></tr></thead>
+          <tbody>
+            <tr><td>Logistic Regression</td><td>72%</td><td>70%</td><td>71%</td><td>70.5%</td></tr>
+            <tr><td>Naïve Bayes</td><td>65%</td><td>63%</td><td>64%</td><td>63.5%</td></tr>
+            <tr><td>K-Nearest Neighbors</td><td>78%</td><td>76%</td><td>77%</td><td>76.5%</td></tr>
+            <tr><td>SVM</td><td>80%</td><td>79%</td><td>78%</td><td>78.5%</td></tr>
+            <tr><td>Decision Tree</td><td>85%</td><td>83%</td><td>84%</td><td>83.5%</td></tr>
+            <tr><td>Random Forest</td><td>91%</td><td>90%</td><td>89%</td><td>89.5%</td></tr>
+            <tr class="best-row"><td>✅ Gradient Boosting</td><td id="tb-acc">83.42%</td><td id="tb-prec">83.57%</td><td id="tb-rec">83.42%</td><td id="tb-f1">83.45%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── PREDICTION HISTORY ──────────────────────────────────────────────── -->
+  <section id="history" class="section">
+    <div class="container">
+      <div class="section-label">Audit Trail</div>
+      <h2 class="section-title">Prediction <span class="gradient-text">History</span></h2>
+      <p class="section-sub">Last 50 predictions made during this session.</p>
+      <div class="history-header">
+        <span id="history-count">0 predictions</span>
+        <button class="btn-sm" onclick="clearHistory()">Clear</button>
+      </div>
+      <div class="history-list" id="history-list">
+        <div class="empty-history">No predictions yet. Make one above!</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FOOTER ─────────────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-logo">CrimeHotspot<span>AI</span> 🇮🇳</div>
+      <p class="footer-sub">Final Year Engineering Project · Computer Science Engineering · India</p>
+      <p class="footer-copy">Built with Flask · Scikit-learn · Leaflet.js · Vanilla JS</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

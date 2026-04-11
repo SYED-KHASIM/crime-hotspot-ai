@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics Dashboard — CrimeHotspotAI India</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root {
+      --dash-bg: #0f1117;
+      --card-bg: #1a1d27;
+      --card-border: rgba(255,255,255,.07);
+      --high: #f87171;
+      --medium: #fbbf24;
+      --low: #34d399;
+      --primary: #6366f1;
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--dash-bg); color: var(--text, #e2e8f0); font-family: 'Inter', sans-serif; margin: 0; }
+
+    /* Navbar override for dashboard */
+    .dash-nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,17,23,.95); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0 2rem; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .dash-nav .logo { font-family: 'Space Grotesk', sans-serif; font-size: 1.2rem; font-weight: 700; color: #e2e8f0; text-decoration: none; }
+    .dash-nav .logo span { color: var(--primary); }
+    .dash-nav-links { display: flex; gap: 1rem; align-items: center; }
+    .dash-nav-links a { color: #94a3b8; text-decoration: none; font-size: .88rem; padding: .4rem .8rem; border-radius: 6px; transition: all .2s; }
+    .dash-nav-links a:hover, .dash-nav-links a.active { background: rgba(99,102,241,.15); color: var(--primary); }
+    .user-chip { background: rgba(99,102,241,.12); color: var(--primary); padding: .3rem .9rem; border-radius: 20px; font-size: .82rem; font-weight: 500; }
+    .logout-btn { background: none; border: 1px solid rgba(248,113,113,.3); color: var(--high); padding: .3rem .8rem; border-radius: 6px; font-size: .82rem; cursor: pointer; font-family: inherit; transition: all .2s; }
+    .logout-btn:hover { background: rgba(248,113,113,.1); }
+
+    /* Page */
+    .dash-page { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+    .dash-header { margin-bottom: 2rem; }
+    .dash-header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.8rem; font-weight: 700; color: #e2e8f0; margin: 0 0 .3rem; }
+    .dash-header p { color: #64748b; font-size: .9rem; margin: 0; }
+
+    /* KPI cards */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .kpi-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 1.25rem 1.5rem;
+    }
+    .kpi-label { font-size: .78rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .4rem; }
+    .kpi-value { font-family: 'Space Grotesk', sans-serif; font-size: 1.8rem; font-weight: 700; color: #e2e8f0; }
+    .kpi-value.high { color: var(--high); }
+    .kpi-value.medium { color: var(--medium); }
+    .kpi-value.low { color: var(--low); }
+    .kpi-value.primary { color: var(--primary); }
+
+    /* Chart grid */
+    .chart-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+    .chart-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 1.5rem; position: relative;
+    }
+    .col-8 { grid-column: span 8; }
+    .col-6 { grid-column: span 6; }
+    .col-4 { grid-column: span 4; }
+    .col-12 { grid-column: span 12; }
+    @media (max-width: 1024px) {
+      .col-8, .col-6, .col-4, .col-12 { grid-column: span 12; }
+    }
+    .chart-title { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 600; color: #e2e8f0; margin: 0 0 1.2rem; }
+    .chart-sub { font-size: .78rem; color: #64748b; margin-left: .5rem; font-weight: 400; }
+    .chart-wrap { position: relative; }
+
+    /* Donut legend */
+    .donut-row { display: flex; gap: 1.5rem; justify-content: center; margin-top: 1rem; }
+    .donut-item { display: flex; align-items: center; gap: .4rem; font-size: .82rem; color: #94a3b8; }
+    .donut-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: absolute; inset: 0; background: rgba(15,17,23,.8);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 12px; z-index: 10;
+    }
+    .spinner-circle {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(99,102,241,.2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error state */
+    .error-state { text-align: center; padding: 3rem; color: #64748b; }
+    .error-state .error-icon { font-size: 2rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="dash-nav">
+    <a href="index.html" class="logo">CrimeHotspot<span>AI</span></a>
+    <div class="dash-nav-links">
+      <a href="index.html">Predict</a>
+      <a href="dashboard.html" class="active">📊 Analytics</a>
+      <span class="user-chip" id="user-chip">Loading...</span>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- PAGE -->
+  <div class="dash-page">
+    <div class="dash-header">
+      <h1>Criminal Analytics Dashboard <span style="font-size:1.2rem">🇮🇳</span></h1>
+      <p>India-wide crime risk insights from 50,000+ records across 25 districts</p>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="kpi-row" id="kpi-row">
+      <div class="kpi-card"><div class="kpi-label">Total Records</div><div class="kpi-value primary" id="kpi-total">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">High Risk Events</div><div class="kpi-value high" id="kpi-high">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Medium Risk Events</div><div class="kpi-value medium" id="kpi-medium">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Low Risk Events</div><div class="kpi-value low" id="kpi-low">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Districts Covered</div><div class="kpi-value primary">25</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-grid">
+
+      <!-- Monthly trend (line) -->
+      <div class="chart-card col-8">
+        <h3 class="chart-title">Monthly Crime Risk Trend <span class="chart-sub">Average risk score per month</span></h3>
+        <div class="chart-wrap" style="height:280px">
+          <canvas id="monthlyChart"></canvas>
+          <div class="loading-overlay" id="load-monthly"><div class="spinner-circle"></div></div>
+        </div>
+      </div>
+
+      <!-- Risk distribution (doughnut) -->
+      <div class="chart-card col-4">
+        <h3 class="chart-title">Risk Distribution <span class="chart-sub">Overall</span></h3>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="riskChart"></canvas>
+          <div class="loading-overlay" id="load-risk"><div class="spinner-circle"></div></div>
+        </div>
+        <div class="donut-row">
+          <div class="donut-item"><div class="donut-dot" style="background:#f87171"></div>High</div>
+          <div class="donut-item"><div class="donut-dot" style="background:#fbbf24"></div>Medium</div>
+          <div class="donut-item"><div class="donut-dot" style="background:#34d399"></div>Low</div>
+        </div>
+      </div>
+
+      <!-- Hourly analysis (bar) -->
+      <div class="chart-card col-12">
+        <h3 class="chart-title">Hour-wise Crime Analysis <span class="chart-sub">Average risk score by hour of day (0–23)</span></h3>
+        <div class="chart-wrap" style="height:240px">
+          <canvas id="hourlyChart"></canvas>
+          <div class="loading-overlay" id="load-hourly"><div class="spinner-circle"></div></div>
+        </div>
+      </div>
+
+      <!-- District hotspots (horizontal bar) -->
+      <div class="chart-card col-6">
+        <h3 class="chart-title">Top Crime Districts <span class="chart-sub">High-risk event count</span></h3>
+        <div class="chart-wrap" style="height:300px">
+          <canvas id="districtChart"></canvas>
+          <div class="loading-overlay" id="load-district"><div class="spinner-circle"></div></div>
+        </div>
+      </div>
+
+      <!-- Day of week (radar) -->
+      <div class="chart-card col-6">
+        <h3 class="chart-title">Day-of-Week Risk Pattern <span class="chart-sub">Average risk score</span></h3>
+        <div class="chart-wrap" style="height:300px">
+          <canvas id="dowChart"></canvas>
+          <div class="loading-overlay" id="load-dow"><div class="spinner-circle"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:5000";
+
+    // Auth check
+    const token = localStorage.getItem("auth_token");
+    const username = localStorage.getItem("auth_user");
+    if (!token) { window.location.href = "login.html"; }
+    document.getElementById("user-chip").textContent = "👤 " + (username || "User");
+
+    function logout() {
+      fetch(`${API_BASE}/auth/logout`, { method: "POST", headers: { "X-Session-Token": token } });
+      localStorage.clear();
+      window.location.href = "login.html";
+    }
+
+    function hideLoader(id) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    }
+
+    // Chart defaults
+    Chart.defaults.color = "#64748b";
+    Chart.defaults.borderColor = "rgba(255,255,255,.06)";
+    Chart.defaults.font.family = "Inter, sans-serif";
+
+    async function loadAnalytics() {
+      try {
+        const res = await fetch(`${API_BASE}/analytics`);
+        if (!res.ok) throw new Error("API error");
+        const data = await res.json();
+
+        // KPIs
+        document.getElementById("kpi-total").textContent  = (data.total_records || 0).toLocaleString();
+        document.getElementById("kpi-high").textContent   = (data.risk_distribution?.High || 0).toLocaleString();
+        document.getElementById("kpi-medium").textContent = (data.risk_distribution?.Medium || 0).toLocaleString();
+        document.getElementById("kpi-low").textContent    = (data.risk_distribution?.Low || 0).toLocaleString();
+
+        // 1. Monthly trend (line)
+        hideLoader("load-monthly");
+        new Chart(document.getElementById("monthlyChart"), {
+          type: "line",
+          data: {
+            labels: data.monthly_trend.labels,
+            datasets: [{
+              label: "Avg Risk Score",
+              data: data.monthly_trend.data,
+              borderColor: "#6366f1",
+              backgroundColor: "rgba(99,102,241,.1)",
+              fill: true,
+              tension: 0.4,
+              pointBackgroundColor: "#6366f1",
+              pointRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { min: 0, max: 0.8, grid: { color: "rgba(255,255,255,.04)" },
+                   ticks: { callback: v => v.toFixed(2) } },
+              x: { grid: { color: "rgba(255,255,255,.04)" } }
+            }
+          }
+        });
+
+        // 2. Risk distribution (doughnut)
+        hideLoader("load-risk");
+        new Chart(document.getElementById("riskChart"), {
+          type: "doughnut",
+          data: {
+            labels: ["High", "Medium", "Low"],
+            datasets: [{
+              data: [data.risk_distribution.High, data.risk_distribution.Medium, data.risk_distribution.Low],
+              backgroundColor: ["#f87171","#fbbf24","#34d399"],
+              borderWidth: 0,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            cutout: "68%",
+            plugins: { legend: { display: false },
+              tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()}` } } }
+          }
+        });
+
+        // 3. Hourly (bar)
+        hideLoader("load-hourly");
+        const hourColors = data.hourly_trend.data.map(v =>
+          v >= 0.55 ? "rgba(248,113,113,.7)" : v >= 0.40 ? "rgba(251,191,36,.7)" : "rgba(52,211,153,.5)"
+        );
+        new Chart(document.getElementById("hourlyChart"), {
+          type: "bar",
+          data: {
+            labels: data.hourly_trend.labels,
+            datasets: [{
+              label: "Avg Risk Score",
+              data: data.hourly_trend.data,
+              backgroundColor: hourColors,
+              borderRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { min: 0, max: 0.8, grid: { color: "rgba(255,255,255,.04)" }, ticks: { callback: v => v.toFixed(2) } },
+              x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 10 } } }
+            }
+          }
+        });
+
+        // 4. District hotspots (horizontal bar)
+        hideLoader("load-district");
+        new Chart(document.getElementById("districtChart"), {
+          type: "bar",
+          data: {
+            labels: data.district_hotspots.labels,
+            datasets: [{
+              label: "High-Risk Events",
+              data: data.district_hotspots.data,
+              backgroundColor: "rgba(248,113,113,.7)",
+              borderRadius: 4,
+            }]
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { color: "rgba(255,255,255,.04)" } },
+              y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+            }
+          }
+        });
+
+        // 5. Day of week (radar)
+        hideLoader("load-dow");
+        new Chart(document.getElementById("dowChart"), {
+          type: "radar",
+          data: {
+            labels: data.day_of_week.labels,
+            datasets: [{
+              label: "Avg Risk Score",
+              data: data.day_of_week.data,
+              borderColor: "#fbbf24",
+              backgroundColor: "rgba(251,191,36,.12)",
+              pointBackgroundColor: "#fbbf24",
+              pointRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              r: {
+                min: 0.2, max: 0.55,
+                grid: { color: "rgba(255,255,255,.06)" },
+                ticks: { display: false },
+                pointLabels: { color: "#94a3b8", font: { size: 12 } }
+              }
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error("Analytics load failed:", err);
+        // Hide all loaders and show error
+        ["load-monthly","load-risk","load-hourly","load-district","load-dow"].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div><div>Start backend to view charts</div></div>`; }
+        });
+      }
+    }
+
+    loadAnalytics();
+  </script>
+</body>
+</html>
