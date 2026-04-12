@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — CrimeHotspotAI India</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .auth-wrapper {
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; background: var(--bg); padding: 2rem; position: relative; overflow: hidden;
+    }
+    .auth-wrapper::before {
+      content: ""; position: absolute; width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(99,102,241,.15) 0%, transparent 70%);
+      bottom: -100px; right: -100px; border-radius: 50%;
+    }
+    .auth-card {
+      width: 100%; max-width: 440px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; position: relative; z-index: 1;
+    }
+    .auth-logo { text-align: center; margin-bottom: 1.5rem; }
+    .auth-logo .logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--text); }
+    .auth-logo .logo-text span { color: var(--primary); }
+    .auth-logo .logo-sub { font-size: .85rem; color: var(--muted); margin-top: .25rem; }
+    .auth-title { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: .5rem; text-align: center; }
+    .auth-subtitle { text-align: center; color: var(--muted); font-size: .9rem; margin-bottom: 1.8rem; }
+    .auth-form .form-group { margin-bottom: 1.1rem; }
+    .auth-form label { display: block; font-size: .85rem; font-weight: 500; color: var(--text); margin-bottom: .4rem; }
+    .auth-form input {
+      width: 100%; padding: .75rem 1rem; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: .9rem; font-family: inherit; transition: border-color .2s; box-sizing: border-box;
+    }
+    .auth-form input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
+    .auth-form input.error { border-color: var(--high); }
+    .field-error { color: var(--high); font-size: .78rem; margin-top: .3rem; min-height: 1rem; }
+    .auth-btn {
+      width: 100%; padding: .85rem; background: var(--primary); color: #fff; border: none; border-radius: 8px;
+      font-size: 1rem; font-weight: 600; font-family: inherit; cursor: pointer; margin-top: .5rem; transition: background .2s, transform .1s;
+    }
+    .auth-btn:hover { background: var(--primary-hover); }
+    .auth-btn:active { transform: scale(.98); }
+    .auth-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .auth-switch { text-align: center; margin-top: 1.5rem; font-size: .88rem; color: var(--muted); }
+    .auth-switch a { color: var(--primary); text-decoration: none; font-weight: 500; }
+    .alert-box { padding: .85rem 1rem; border-radius: 8px; font-size: .88rem; margin-bottom: 1.2rem; display: none; }
+    .alert-box.error { background: rgba(248,113,113,.1); border: 1px solid var(--high); color: var(--high); }
+    .alert-box.success { background: rgba(52,211,153,.1); border: 1px solid var(--low); color: var(--low); }
+    .password-strength { height: 4px; border-radius: 2px; margin-top: .4rem; background: var(--border); overflow: hidden; }
+    .strength-bar { height: 100%; border-radius: 2px; transition: width .3s, background .3s; width: 0%; }
+  </style>
+</head>
+<body>
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-text">CrimeHotspot<span>AI</span></div>
+        <div class="logo-sub">🇮🇳 India Crime Intelligence Platform</div>
+      </div>
+      <h1 class="auth-title">Create Account</h1>
+      <p class="auth-subtitle">Join the platform to start predicting crime hotspots</p>
+
+      <div class="alert-box" id="alert-box"></div>
+
+      <form class="auth-form" id="register-form" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="Choose a username (min 3 chars)" autocomplete="username" />
+          <div class="field-error" id="err-username"></div>
+        </div>
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" placeholder="Enter your email" autocomplete="email" />
+          <div class="field-error" id="err-email"></div>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Create a password (min 6 chars)"
+                 autocomplete="new-password" oninput="checkStrength(this.value)" />
+          <div class="password-strength"><div class="strength-bar" id="strength-bar"></div></div>
+          <div class="field-error" id="err-password"></div>
+        </div>
+        <div class="form-group">
+          <label for="confirm">Confirm Password</label>
+          <input type="password" id="confirm" placeholder="Re-enter your password" autocomplete="new-password" />
+          <div class="field-error" id="err-confirm"></div>
+        </div>
+        <button type="submit" class="auth-btn" id="reg-btn">Create Account</button>
+      </form>
+
+      <div class="auth-switch">
+        Already have an account? <a href="login.html">Sign in</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:5000";
+
+    if (localStorage.getItem("auth_token")) window.location.href = "index.html";
+
+    function checkStrength(val) {
+      const bar = document.getElementById("strength-bar");
+      let score = 0;
+      if (val.length >= 6)  score++;
+      if (val.length >= 10) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^a-zA-Z0-9]/.test(val)) score++;
+      const pct = (score / 5) * 100;
+      const color = score <= 1 ? "#f87171" : score <= 3 ? "#fbbf24" : "#34d399";
+      bar.style.width = pct + "%";
+      bar.style.background = color;
+    }
+
+    function showAlert(msg, type = "error") {
+      const box = document.getElementById("alert-box");
+      box.textContent = msg;
+      box.className = `alert-box ${type}`;
+      box.style.display = "block";
+    }
+
+    function clearErrors() {
+      ["err-username","err-email","err-password","err-confirm"].forEach(id => {
+        document.getElementById(id).textContent = "";
+      });
+      document.getElementById("alert-box").style.display = "none";
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      clearErrors();
+
+      const username = document.getElementById("username").value.trim();
+      const email    = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const confirm  = document.getElementById("confirm").value;
+      let ok = true;
+
+      if (!username || username.length < 3) {
+        document.getElementById("err-username").textContent = "Username must be at least 3 characters";
+        ok = false;
+      }
+      if (!email || !email.includes("@")) {
+        document.getElementById("err-email").textContent = "Please enter a valid email";
+        ok = false;
+      }
+      if (!password || password.length < 6) {
+        document.getElementById("err-password").textContent = "Password must be at least 6 characters";
+        ok = false;
+      }
+      if (password !== confirm) {
+        document.getElementById("err-confirm").textContent = "Passwords do not match";
+        ok = false;
+      }
+      if (!ok) return;
+
+      const btn = document.getElementById("reg-btn");
+      btn.disabled = true;
+      btn.textContent = "Creating account...";
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, email, password }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          showAlert("Account created! Redirecting to login...", "success");
+          setTimeout(() => { window.location.href = "login.html"; }, 1200);
+        } else if (data.details) {
+          Object.entries(data.details).forEach(([field, msg]) => {
+            const el = document.getElementById(`err-${field}`);
+            if (el) el.textContent = msg;
+          });
+          btn.disabled = false;
+          btn.textContent = "Create Account";
+        } else {
+          showAlert(data.error || "Registration failed.");
+          btn.disabled = false;
+          btn.textContent = "Create Account";
+        }
+      } catch (err) {
+        showAlert("Cannot connect to server. Make sure the backend is running.");
+        btn.disabled = false;
+        btn.textContent = "Create Account";
+      }
+    }
+  </script>
+</body>
+</html>
